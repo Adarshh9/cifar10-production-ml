@@ -1,0 +1,23 @@
+artifact_path: file:C:/Users/akesh/OneDrive/Adarshh/MLOps-project1/ml-prod-pipeline/mlartifacts/1/models/m-c7cd25a3c89e43588fbae154c86df6ec/artifacts
+flavors:
+  python_function:
+    config:
+      device: null
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pytorch
+    pickle_module_name: mlflow.pytorch.pickle_module
+    python_version: 3.12.10
+  pytorch:
+    code: null
+    model_data: data
+    pytorch_version: 2.9.0+cu128
+mlflow_version: 3.5.1
+model_id: m-c7cd25a3c89e43588fbae154c86df6ec
+model_size_bytes: 44781543
+model_uuid: m-c7cd25a3c89e43588fbae154c86df6ec
+prompts: null
+run_id: bc2734cc1a9242b69257c3243fe95b83
+utc_time_created: '2025-10-26 09:54:39.404343'

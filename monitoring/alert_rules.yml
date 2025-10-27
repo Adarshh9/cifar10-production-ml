@@ -1,0 +1,39 @@
+groups:
+  - name: ml_api_alerts
+    interval: 30s
+    rules:
+      - alert: HighLatency
+        expr: http_request_duration_seconds_bucket{le="0.5"} < 0.95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency detected"
+          description: "P95 latency is above 500ms for 5 minutes"
+      
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate"
+          description: "Error rate is above 5% for 2 minutes"
+      
+      - alert: ModelNotLoaded
+        expr: model_loaded == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Model not loaded"
+          description: "ML model is not loaded in the API"
+      
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis connection failed"

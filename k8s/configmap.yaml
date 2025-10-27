@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-api-config
+data:
+  MODEL_NAME: "TaxoCapsNet"
+  LOG_LEVEL: "INFO"
+  CACHE_TTL: "3600"

@@ -1,0 +1,33 @@
+model:
+  name: "CIFAR10_ResNet18"
+  architecture: "ResNet-18"
+  num_classes: 10
+  input_size: [3, 32, 32]
+
+training:
+  batch_size: 128
+  epochs: 50
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  use_amp: true  # Mixed precision training
+
+data:
+  dataset: "CIFAR-10"
+  num_workers: 4
+  train_size: 45000
+  val_size: 5000
+  test_size: 10000
+
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  experiment_name: "cifar10_production"
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  ttl: 3600
+
+inference:
+  batch_size_limit: 32
+  cache_enabled: true
