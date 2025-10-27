@@ -1,51 +1,11 @@
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-env/
 venv/
-*.egg-info/
-dist/
-build/
-
-# PyTorch
 *.pth
 *.pt
-checkpoints/
-runs/
-
-# Data
 data/
-*.csv
-*.json
 mlruns/
-
-# Docker
-*.log
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Secrets
 .env
-*.key
-*.pem
-
-# Test artifacts
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Temporary files
+.DS_Store
 test.png
 test_load.png
-*.tmp
