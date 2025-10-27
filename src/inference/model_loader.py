@@ -6,7 +6,6 @@ import mlflow
 
 logger = logging.getLogger(__name__)
 
-
 class ModelLoader:
     """Load model from MLflow or local path."""
     
@@ -17,7 +16,8 @@ class ModelLoader:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model_version = "local"
         
-        mlflow.set_tracking_uri(mlflow_uri)
+        if mlflow_uri:
+            mlflow.set_tracking_uri(mlflow_uri)
     
     def load_from_registry(self, stage: str = "Production") -> bool:
         """Load model from MLflow registry."""

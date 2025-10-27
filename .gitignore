@@ -1,11 +1,52 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+env/
 venv/
-# *.pth
+.venv/
+*.egg-info/
+dist/
+build/
+
+# PyTorch
+*.pth
 *.pt
+checkpoints/
+
+# Data
 data/
+*.csv
+*.json
 mlruns/
-.env
+
+# Docker
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+
+# Test files
 test.png
 test_load.png
+
+# AWS
+.aws/
+
+# GitHub Actions
+.github/workflows/*.local.yml

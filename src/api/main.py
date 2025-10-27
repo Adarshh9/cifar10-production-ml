@@ -5,7 +5,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 import logging
 from contextlib import asynccontextmanager
 import os
-from urllib.parse import urlparse
 
 from src.api.routes import router
 from src.api import dependencies
@@ -13,7 +12,11 @@ from src.inference.model_loader import ModelLoader
 from src.inference.predictor import CIFAR10Predictor
 from src.utils.cache import RedisCache
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -27,40 +30,34 @@ async def lifespan(app: FastAPI):
         mlflow_uri=os.getenv("MLFLOW_URI", "http://mlflow:5000")
     )
     
+    # Try loading from MLflow registry, fallback to local
     if not model_loader.load_from_registry(stage="Production"):
         logger.warning("⚠️ Falling back to local model")
         model_loader.load_from_path("models/best_model.pth")
     
-    # Initialize cache - Railway compatibility
-    redis_url = os.getenv("REDIS_URL")
-    if redis_url:
-        # Parse Railway's REDIS_URL (redis://user:pass@host:port)
-        parsed = urlparse(redis_url)
-        cache = RedisCache(
-            host=parsed.hostname,
-            port=parsed.port,
-            password=parsed.password
-        )
-    else:
-        # Local development
-        cache = RedisCache(
-            host=os.getenv("REDIS_HOST", "redis"),
-            port=int(os.getenv("REDIS_PORT", 6379))
-        )
+    # Initialize Redis cache
+    redis_host = os.getenv("REDIS_HOST", "localhost")
+    redis_port = int(os.getenv("REDIS_PORT", 6379))
+    
+    cache = RedisCache(host=redis_host, port=redis_port)
     
     # Initialize predictor
     predictor = CIFAR10Predictor(model_loader, use_cache=True)
     predictor.set_cache(cache)
     
+    # Set global dependencies
     dependencies.set_predictor(predictor)
     dependencies.set_model_loader(model_loader)
     dependencies.set_cache(cache)
     
     logger.info("✅ API ready!")
+    logger.info(f"📊 Model: CIFAR10_ResNet18")
     logger.info(f"🔧 Cache enabled: {cache.is_connected()}")
+    logger.info(f"🎯 Classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck")
     
     yield
     
+    # Shutdown
     logger.info("Shutting down...")
 
 # Create FastAPI app
@@ -74,7 +71,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

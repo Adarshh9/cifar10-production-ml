@@ -1,62 +1,48 @@
-"""Redis caching utilities with Railway support."""
+"""Redis caching utilities."""
 import redis
 import json
 import logging
 from typing import Any, Optional
-import os
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 class RedisCache:
-    """Redis cache wrapper with Railway support."""
+    """Redis cache wrapper."""
     
     def __init__(
         self,
         host: str = 'localhost',
         port: int = 6379,
-        password: str = None,
         db: int = 0,
+        password: str = None,
         decode_responses: bool = True
     ):
-        # Support Railway's REDIS_URL
-        redis_url = os.getenv('REDIS_URL')
+        """
+        Initialize Redis connection.
         
-        if redis_url:
-            logger.info("Using Railway REDIS_URL")
-            try:
-                parsed = urlparse(redis_url)
-                self.client = redis.Redis(
-                    host=parsed.hostname or host,
-                    port=parsed.port or port,
-                    password=parsed.password or password,
-                    db=db,
-                    decode_responses=decode_responses,
-                    socket_timeout=5,
-                    socket_connect_timeout=5
-                )
-                self.client.ping()
-                logger.info(f"✅ Connected to Redis (Railway)")
-            except Exception as e:
-                logger.error(f"Failed to connect to Redis: {e}")
-                self.client = None
-        else:
-            # Local development
-            try:
-                self.client = redis.Redis(
-                    host=host,
-                    port=port,
-                    password=password,
-                    db=db,
-                    decode_responses=decode_responses,
-                    socket_timeout=5,
-                    socket_connect_timeout=5
-                )
-                self.client.ping()
-                logger.info(f"✅ Connected to Redis at {host}:{port}")
-            except Exception as e:
-                logger.error(f"Failed to connect to Redis: {e}")
-                self.client = None
+        Args:
+            host: Redis host
+            port: Redis port
+            db: Redis database number
+            password: Redis password (optional)
+            decode_responses: Whether to decode responses to strings
+        """
+        try:
+            self.client = redis.Redis(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                decode_responses=decode_responses,
+                socket_timeout=5,
+                socket_connect_timeout=5
+            )
+            # Test connection
+            self.client.ping()
+            logger.info(f"✅ Connected to Redis at {host}:{port}")
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            self.client = None
     
     def is_connected(self) -> bool:
         """Check if connected to Redis."""
