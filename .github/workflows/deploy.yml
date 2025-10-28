@@ -62,7 +62,22 @@ jobs:
           
           # Cleanup
           docker image prune -af
-    
+    - name: Deploy Frontend
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Update frontend
+          mkdir -p ~/frontend
+          cat > ~/frontend/index.html << 'HTMLEOF'
+          [PASTE THE ENTIRE HTML FROM ABOVE]
+          HTMLEOF
+          
+          # Restart nginx
+          docker restart frontend || docker run -d --name frontend --restart unless-stopped -p 80:80 -v ~/frontend:/usr/share/nginx/html:ro nginx:alpine
+
     - name: Verify deployment
       run: |
         sleep 15
