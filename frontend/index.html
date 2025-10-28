@@ -280,14 +280,14 @@
 
         <div class="links">
             <a href="/docs" class="link-btn" target="_blank">📚 API Docs</a>
-            <a href="/metrics" class="link-btn" target="_blank">📊 Metrics</a>
+            <a href="http://3.88.101.238:9090" class="link-btn" target="_blank">📊 Prometheus</a>
+            <a href="http://3.88.101.238:3000" class="link-btn" target="_blank">📈 Grafana</a>
             <a href="https://github.com/Adarshh9/cifar10-production-ml" class="link-btn" target="_blank">💻 GitHub</a>
         </div>
     </div>
 
     <script>
-        // Get API URL from current host
-        const API_URL = window.location.origin.replace(':80', ':8000');
+        const API_URL = 'http://3.88.101.238:8000';
         const classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'];
         
         let selectedFile = null;
@@ -300,9 +300,13 @@
         const result = document.getElementById('result');
         const errorDiv = document.getElementById('error');
 
+        // Click to upload
         uploadArea.addEventListener('click', () => fileInput.click());
+
+        // File selected
         fileInput.addEventListener('change', handleFileSelect);
 
+        // Drag and drop
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
