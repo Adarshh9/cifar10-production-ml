@@ -35,7 +35,7 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
     
-    - name: Deploy to EC2
+    - name: Deploy API to EC2
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
@@ -60,32 +60,76 @@ jobs:
             --network host \
             ${{ secrets.ECR_REPOSITORY }}:latest
           
-          # Cleanup
+          # Cleanup old images
           docker image prune -af
-    - name: Deploy Frontend
+    
+    - name: Deploy Frontend to EC2
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "frontend/*"
+        target: "~/"
+    
+    - name: Start Frontend Container
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Update frontend
-          mkdir -p ~/frontend
-          cat > ~/frontend/index.html << 'HTMLEOF'
-          [PASTE THE ENTIRE HTML FROM ABOVE]
-          HTMLEOF
-          
-          # Restart nginx
-          docker restart frontend || docker run -d --name frontend --restart unless-stopped -p 80:80 -v ~/frontend:/usr/share/nginx/html:ro nginx:alpine
+          # Restart frontend nginx container
+          docker stop frontend || true
+          docker rm frontend || true
+          docker run -d \
+            --name frontend \
+            --restart unless-stopped \
+            -p 80:80 \
+            -v ~/frontend:/usr/share/nginx/html:ro \
+            nginx:alpine
 
-    - name: Verify deployment
+    - name: Wait for services to start
       run: |
-        sleep 15
-        curl -f http://${{ secrets.EC2_HOST }}:8000/health || exit 1
+        echo "⏳ Waiting for services to initialize..."
+        sleep 60
+    
+    - name: Verify API deployment
+      run: |
+        echo "🔍 Checking API health..."
+        MAX_RETRIES=10
+        RETRY_COUNT=0
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          if curl -f --connect-timeout 5 http://${{ secrets.EC2_HOST }}:8000/health; then
+            echo "✅ API is healthy!"
+            exit 0
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          echo "⏳ Attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 10s..."
+          sleep 10
+        done
+        
+        echo "❌ API health check failed after $MAX_RETRIES attempts"
+        exit 1
+    
+    - name: Verify Frontend deployment
+      run: |
+        echo "🔍 Checking Frontend..."
+        if curl -f --connect-timeout 5 http://${{ secrets.EC2_HOST }}/ > /dev/null 2>&1; then
+          echo "✅ Frontend is accessible!"
+        else
+          echo "⚠️ Frontend check failed (non-critical)"
+        fi
 
     - name: Deployment success notification
       if: success()
       run: |
         echo "🎉 Deployment successful!"
-        echo "API: http://${{ secrets.EC2_HOST }}:8000"
-        echo "Docs: http://${{ secrets.EC2_HOST }}:8000/docs"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🌐 Frontend:  http://${{ secrets.EC2_HOST }}"
+        echo "🚀 API:       http://${{ secrets.EC2_HOST }}:8000"
+        echo "📚 API Docs:  http://${{ secrets.EC2_HOST }}:8000/docs"
+        echo "📊 Metrics:   http://${{ secrets.EC2_HOST }}:8000/metrics"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
