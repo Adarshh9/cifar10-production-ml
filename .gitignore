@@ -17,7 +17,7 @@ build/
 checkpoints/
 
 # Data
-data/
+data_/
 *.csv
 *.json
 mlruns/
