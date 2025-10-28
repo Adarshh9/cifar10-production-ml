@@ -280,126 +280,133 @@
 
         <div class="links">
             <a href="/docs" class="link-btn" target="_blank">📚 API Docs</a>
-            <a href="http://3.88.101.238:9090" class="link-btn" target="_blank">📊 Prometheus</a>
-            <a href="http://3.88.101.238:3000" class="link-btn" target="_blank">📈 Grafana</a>
+            <a href="/metrics" class="link-btn" target="_blank">📊 Metrics</a>
             <a href="https://github.com/Adarshh9/cifar10-production-ml" class="link-btn" target="_blank">💻 GitHub</a>
         </div>
     </div>
 
     <script>
-        const API_URL = 'http://3.88.101.238:8000';
-        const classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'];
-        
-        let selectedFile = null;
+    // Fix API URL construction
+    const hostname = window.location.hostname;
+    const API_URL = '/api';    
+    
+    console.log('API URL:', API_URL); // Debug log
+    
+    const classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'];
+    
+    let selectedFile = null;
 
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const preview = document.getElementById('preview');
-        const predictBtn = document.getElementById('predictBtn');
-        const loading = document.getElementById('loading');
-        const result = document.getElementById('result');
-        const errorDiv = document.getElementById('error');
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const predictBtn = document.getElementById('predictBtn');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const errorDiv = document.getElementById('error');
 
-        // Click to upload
-        uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileSelect);
 
-        // File selected
-        fileInput.addEventListener('change', handleFileSelect);
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
 
-        // Drag and drop
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                selectedFile = file;
-                showPreview(file);
-            }
-        });
-
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if (file) {
-                selectedFile = file;
-                showPreview(file);
-            }
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            selectedFile = file;
+            showPreview(file);
         }
+    });
 
-        function showPreview(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
-                predictBtn.disabled = false;
-                result.classList.remove('show');
-                errorDiv.classList.remove('show');
-            };
-            reader.readAsDataURL(file);
+    function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (file) {
+            selectedFile = file;
+            showPreview(file);
         }
+    }
 
-        predictBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
-
-            loading.classList.add('show');
+    function showPreview(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+            predictBtn.disabled = false;
             result.classList.remove('show');
             errorDiv.classList.remove('show');
-            predictBtn.disabled = true;
+        };
+        reader.readAsDataURL(file);
+    }
 
-            try {
-                const formData = new FormData();
-                formData.append('file', selectedFile);
+    predictBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
 
-                const response = await fetch(`${API_URL}/predict`, {
-                    method: 'POST',
-                    body: formData
-                });
+        loading.classList.add('show');
+        result.classList.remove('show');
+        errorDiv.classList.remove('show');
+        predictBtn.disabled = true;
 
-                if (!response.ok) throw new Error('Prediction failed');
+        try {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
 
-                const data = await response.json();
-                showResult(data);
+            console.log('Sending request to:', `${API_URL}/predict`);
 
-            } catch (error) {
-                errorDiv.textContent = `Error: ${error.message}. Make sure the API is running.`;
-                errorDiv.classList.add('show');
-            } finally {
-                loading.classList.remove('show');
-                predictBtn.disabled = false;
-            }
-        });
-
-        function showResult(data) {
-            document.getElementById('predictionText').textContent = data.class_name.toUpperCase();
-            document.getElementById('confidenceText').textContent = 
-                `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
-
-            const probsList = document.getElementById('probabilitiesList');
-            probsList.innerHTML = '';
-
-            data.probabilities.forEach((prob, idx) => {
-                const item = document.createElement('div');
-                item.className = 'prob-item';
-                item.innerHTML = `
-                    <div class="prob-label">${classes[idx]}</div>
-                    <div class="prob-bar">
-                        <div class="prob-fill" style="width: ${prob * 100}%">
-                            ${(prob * 100).toFixed(1)}%
-                        </div>
-                    </div>
-                `;
-                probsList.appendChild(item);
+            const response = await fetch(`${API_URL}/predict`, {
+                method: 'POST',
+                body: formData,
+                mode: 'cors' // Explicitly request CORS
             });
 
-            result.classList.add('show');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Server returned ${response.status}: ${errorText}`);
+            }
+
+            const data = await response.json();
+            showResult(data);
+
+        } catch (error) {
+            console.error('Prediction error:', error);
+            errorDiv.textContent = `Error: ${error.message}`;
+            errorDiv.classList.add('show');
+        } finally {
+            loading.classList.remove('show');
+            predictBtn.disabled = false;
         }
+    });
+
+    function showResult(data) {
+        document.getElementById('predictionText').textContent = data.class_name.toUpperCase();
+        document.getElementById('confidenceText').textContent = 
+            `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+
+        const probsList = document.getElementById('probabilitiesList');
+        probsList.innerHTML = '';
+
+        data.probabilities.forEach((prob, idx) => {
+            const item = document.createElement('div');
+            item.className = 'prob-item';
+            item.innerHTML = `
+                <div class="prob-label">${classes[idx]}</div>
+                <div class="prob-bar">
+                    <div class="prob-fill" style="width: ${prob * 100}%">
+                        ${(prob * 100).toFixed(1)}%
+                    </div>
+                </div>
+            `;
+            probsList.appendChild(item);
+        });
+
+        result.classList.add('show');
+    }
     </script>
 </body>
 </html>

@@ -79,14 +79,17 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Restart frontend nginx container
+          # Stop old frontend
           docker stop frontend || true
           docker rm frontend || true
+          
+          # Run with custom nginx config
           docker run -d \
             --name frontend \
             --restart unless-stopped \
-            -p 80:80 \
-            -v ~/frontend:/usr/share/nginx/html:ro \
+            --network host \
+            -v ~/frontend/index.html:/usr/share/nginx/html/index.html:ro \
+            -v ~/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro \
             nginx:alpine
 
     - name: Wait for services to start
