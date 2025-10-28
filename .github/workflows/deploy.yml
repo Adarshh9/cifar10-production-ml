@@ -1,0 +1,76 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: cifar10-ml-api
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+    
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Login to ECR
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY }}
+          
+          # Stop old container
+          docker stop ml-api || true
+          docker rm ml-api || true
+          
+          # Pull and run new container
+          docker pull ${{ secrets.ECR_REPOSITORY }}:latest
+          docker run -d \
+            --name ml-api \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -e REDIS_HOST=localhost \
+            -e REDIS_PORT=6379 \
+            --network host \
+            ${{ secrets.ECR_REPOSITORY }}:latest
+          
+          # Cleanup
+          docker image prune -af
+    
+    - name: Verify deployment
+      run: |
+        sleep 15
+        curl -f http://${{ secrets.EC2_HOST }}:8000/health || exit 1
+
+    - name: Deployment success notification
+      if: success()
+      run: |
+        echo "🎉 Deployment successful!"
+        echo "API: http://${{ secrets.EC2_HOST }}:8000"
+        echo "Docs: http://${{ secrets.EC2_HOST }}:8000/docs"
