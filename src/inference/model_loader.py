@@ -3,8 +3,13 @@ import torch
 import logging
 from typing import Optional
 import mlflow
+import mlflow.pytorch
+import os
+from pathlib import Path
+
 
 logger = logging.getLogger(__name__)
+
 
 class ModelLoader:
     """Load model from MLflow or local path."""
@@ -22,25 +27,49 @@ class ModelLoader:
     def load_from_registry(self, stage: str = "Production") -> bool:
         """Load model from MLflow registry."""
         try:
-            model_uri = f"models:/{self.model_name}/{stage}"
+            model_uri = "models:/CIFAR10_ResNet18/Production"
+            logger.info(f"Loading model from MLflow: {model_uri}")
+
+            # Use mlflow.pytorch.load_model directly; it handles the registry lookup
             self.model = mlflow.pytorch.load_model(model_uri)
             self.model = self.model.to(self.device)
             self.model.eval()
             self.model_version = stage
-            logger.info(f"✅ Loaded model from registry: {model_uri}")
+            logger.info(f"✅ Loaded model from MLflow registry: {model_uri}")
             return True
+
         except Exception as e:
             logger.error(f"Failed to load model from registry: {e}")
             return False
+
     
     def load_from_path(self, path: str) -> bool:
         """Load model from local checkpoint."""
         try:
+            # Handle both direct file paths and directories
+            path = str(path)
+            
+            # If it's a directory, look for best_model.pth inside
+            if os.path.isdir(path):
+                model_file = os.path.join(path, "best_model.pth")
+                if os.path.exists(model_file):
+                    path = model_file
+                else:
+                    logger.error(f"No model file found in directory: {path}")
+                    return False
+            
+            # Check if file exists
+            if not os.path.exists(path):
+                logger.error(f"Model file not found: {path}")
+                return False
+            
+            logger.info(f"Loading model from: {path}")
+            
             # Import the model class
             from src.training.model import create_model
             
             # Create model
-            self.model = create_model(num_classes=10, pretrained=False)
+            self.model = create_model(num_classes=10, weights=False)
             
             # Load checkpoint
             checkpoint = torch.load(path, map_location=self.device)
@@ -56,11 +85,13 @@ class ModelLoader:
             
             self.model = self.model.to(self.device)
             self.model.eval()
-            self.model_version = "local"
+            self.model_version = "mlflow" if "mlflow" in path else "local"
+            
             logger.info(f"✅ Loaded model from {path}")
             return True
+            
         except Exception as e:
-            logger.error(f"Failed to load model from path: {e}")
+            logger.error(f"Failed to load model from path {path}: {e}")
             return False
     
     def is_loaded(self) -> bool:

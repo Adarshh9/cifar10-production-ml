@@ -14,11 +14,11 @@ class CIFAR10ResNet(nn.Module):
     - Perfect for demonstrating MLOps
     """
     
-    def __init__(self, num_classes: int = 10, pretrained: bool = False):
+    def __init__(self, num_classes: int = 10, weights: bool = False):
         super(CIFAR10ResNet, self).__init__()
         
         # Load ResNet-18
-        self.model = models.resnet18(pretrained=pretrained)
+        self.model = models.resnet18(weights=weights)
         
         # Adapt first conv layer for 32x32 images (CIFAR-10)
         # Original ResNet uses 7x7 kernel for 224x224 ImageNet images
@@ -36,7 +36,7 @@ class CIFAR10ResNet(nn.Module):
         return self.model(x)
 
 
-def create_model(num_classes: int = 10, pretrained: bool = False) -> CIFAR10ResNet:
+def create_model(num_classes: int = 10, weights: bool = False) -> CIFAR10ResNet:
     """
     Factory function to create model.
     
@@ -47,4 +47,4 @@ def create_model(num_classes: int = 10, pretrained: bool = False) -> CIFAR10ResN
     Returns:
         Initialized model
     """
-    return CIFAR10ResNet(num_classes=num_classes, pretrained=pretrained)
+    return CIFAR10ResNet(num_classes=num_classes, weights=weights)

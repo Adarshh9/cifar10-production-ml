@@ -1,29 +1,33 @@
-# version: '3.8'
-
 services:
-  # MLflow Tracking Server
   mlflow:
-    image: python:3.10-slim
+    image: ghcr.io/mlflow/mlflow:v2.9.2
     container_name: mlflow
     ports:
       - "5000:5000"
     volumes:
-      - mlflow_data:/mlflow
+      - ./mlflow_data:/mlflow
     working_dir: /mlflow
+    environment:
+      - BACKEND_STORE_URI=sqlite:////mlflow/mlflow.db
+      - DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+      - MLFLOW_ARTIFACT_URI=/mlflow/artifacts   
+      - MLFLOW_HOST=0.0.0.0 
     command: >
-      sh -c "
-        pip install mlflow==2.8.0 &&
-        mlflow server
-        --backend-store-uri sqlite:////mlflow/mlflow.db
-        --default-artifact-root /mlflow/artifacts
-        --host 0.0.0.0
-        --port 5000
-        --gunicorn-opts '--bind 0.0.0.0:5000'
-      "
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+      --serve-artifacts
     networks:
       - ml-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -34,23 +38,12 @@ services:
     command: redis-server --appendonly yes
     networks:
       - ml-network
-  
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: postgres
-    environment:
-      POSTGRES_DB: mlops_db
-      POSTGRES_USER: mlops_user
-      POSTGRES_PASSWORD: changeme
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - ml-network
-  
-  # FastAPI Application
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   api:
     build:
       context: .
@@ -61,18 +54,19 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - REDIS_HOST=redis
-      - POSTGRES_HOST=postgres
+      - REDIS_PORT=6379
     depends_on:
-      - mlflow
-      - redis
-      - postgres
+      mlflow:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./models:/app/models
       - ./src:/app/src
     networks:
       - ml-network
-  
-  # Prometheus
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -80,15 +74,14 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
     networks:
       - ml-network
-  
-  # Grafana
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -99,25 +92,16 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
     networks:
       - ml-network
-  
-  # Node Exporter (system metrics)
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
-    ports:
-      - "9100:9100"
-    networks:
-      - ml-network
+    restart: unless-stopped
 
 volumes:
   mlflow_data:
   redis_data:
-  postgres_data:
   prometheus_data:
   grafana_data:
 

@@ -9,42 +9,79 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class MLflowTracker:
-    """Wrapper for MLflow tracking operations."""
+    """MLflow tracking wrapper for experiments."""
     
     def __init__(
         self,
         tracking_uri: str = "http://localhost:5000",
-        experiment_name: str = "default"
+        experiment_name: str = "cifar10_production"
     ):
         """
+        Initialize MLflow tracker.
+        
         Args:
             tracking_uri: MLflow tracking server URI
             experiment_name: Name of the experiment
         """
         mlflow.set_tracking_uri(tracking_uri)
-        mlflow.set_experiment(experiment_name)
-        self.client = MlflowClient()
+        
+        # Create experiment if it doesn't exist
+        try:
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+            if experiment is None:
+                experiment_id = mlflow.create_experiment(experiment_name)
+                logger.info(f"Created experiment: {experiment_name}")
+            else:
+                experiment_id = experiment.experiment_id
+                logger.info(f"Using existing experiment: {experiment_name}")
+        except Exception as e:
+            logger.error(f"Error setting up experiment: {e}")
+            raise
+        
+        self.experiment_name = experiment_name
+        self.experiment_id = experiment_id
+        self.client = MlflowClient(tracking_uri)
         self.run_id = None
-        logger.info(f"MLflow tracking URI: {tracking_uri}")
-        logger.info(f"Experiment: {experiment_name}")
     
     def start_run(self, run_name: Optional[str] = None):
-        """Start a new MLflow run."""
-        self.run = mlflow.start_run(run_name=run_name)
-        self.run_id = self.run.info.run_id
-        logger.info(f"Started run: {self.run_id}")
-        return self.run
+        """Start an MLflow run."""
+        self.active_run = mlflow.start_run(
+            experiment_id=self.experiment_id,
+            run_name=run_name
+        )
+        self.run_id = self.active_run.info.run_id
+        logger.info(f"Started MLflow run: {self.run_id}")
+        return self
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        if exc_type is not None:
+            logger.error(f"Run failed: {exc_val}")
+            mlflow.set_tag("status", "failed")
+        else:
+            mlflow.set_tag("status", "completed")
+        mlflow.end_run()
+        logger.info("Ended MLflow run")
     
     def log_params(self, params: Dict[str, Any]):
         """Log parameters."""
-        mlflow.log_params(params)
-        logger.info(f"Logged {len(params)} parameters")
+        for key, value in params.items():
+            mlflow.log_param(key, value)
     
     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
         """Log metrics."""
-        mlflow.log_metrics(metrics, step=step)
+        for key, value in metrics.items():
+            mlflow.log_metric(key, value, step=step)
+    
+    def set_tags(self, tags: Dict[str, str]):
+        """Set tags."""
+        for key, value in tags.items():
+            mlflow.set_tag(key, value)
     
     def log_model(
         self,
@@ -52,65 +89,25 @@ class MLflowTracker:
         artifact_path: str = "model",
         registered_model_name: Optional[str] = None
     ):
-        """Log PyTorch model."""
-        mlflow.pytorch.log_model(
-            model,
-            artifact_path=artifact_path,
-            registered_model_name=registered_model_name
-        )
-        logger.info(f"Logged model to {artifact_path}")
+        """
+        Log PyTorch model to MLflow.
+        
+        Args:
+            model: PyTorch model to log
+            artifact_path: Path where model will be stored
+            registered_model_name: Name to register model in registry
+        """
+        try:
+            mlflow.pytorch.log_model(
+                pytorch_model=model,
+                artifact_path=artifact_path,
+                registered_model_name=registered_model_name
+            )
+            logger.info(f"Logged model to MLflow: {artifact_path}")
+        except Exception as e:
+            logger.error(f"Failed to log model: {e}")
+            raise
     
     def log_artifact(self, local_path: str, artifact_path: Optional[str] = None):
-        """Log artifact file."""
+        """Log a local file or directory as an artifact."""
         mlflow.log_artifact(local_path, artifact_path)
-    
-    def set_tags(self, tags: Dict[str, str]):
-        """Set run tags."""
-        mlflow.set_tags(tags)
-    
-    def end_run(self):
-        """End the current run."""
-        mlflow.end_run()
-        logger.info(f"Ended run: {self.run_id}")
-
-
-def log_training_run(
-    model: torch.nn.Module,
-    params: Dict[str, Any],
-    metrics: Dict[str, float],
-    model_name: str,
-    tracking_uri: str,
-    experiment_name: str
-) -> str:
-    """
-    Log a complete training run to MLflow.
-    
-    Returns:
-        run_id: The MLflow run ID
-    """
-    tracker = MLflowTracker(tracking_uri, experiment_name)
-    
-    with tracker.start_run(run_name=f"{model_name}_training"):
-        # Log parameters
-        tracker.log_params(params)
-        
-        # Log final metrics
-        tracker.log_metrics(metrics)
-        
-        # Log model
-        tracker.log_model(
-            model,
-            artifact_path="model",
-            registered_model_name=model_name
-        )
-        
-        # Set tags
-        tracker.set_tags({
-            "model_type": "TaxoCapsNet",
-            "framework": "pytorch",
-            "stage": "training"
-        })
-        
-        run_id = tracker.run_id
-    
-    return run_id

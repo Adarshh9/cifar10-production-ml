@@ -217,7 +217,7 @@ def main(args):
     # Data
     logger.info("Loading CIFAR-10 dataset...")
     data_module = CIFAR10DataModule(
-        data_dir='./data',
+        data_dir='./data_',
         batch_size=config['batch_size'],
         num_workers=4
     )
@@ -225,7 +225,7 @@ def main(args):
     
     # Model
     logger.info("Creating ResNet-18 model...")
-    model = create_model(num_classes=10, pretrained=args.pretrained)
+    model = create_model(num_classes=10, weights=args.weights)
     logger.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     # MLflow tracking
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=128, help='Batch size')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
-    parser.add_argument('--pretrained', action='store_true', help='Use pretrained weights')
+    parser.add_argument('--weights', action='store_true', help='Use pretrained weights')
     
     args = parser.parse_args()
     main(args)
